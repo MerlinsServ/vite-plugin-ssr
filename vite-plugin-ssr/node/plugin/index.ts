@@ -8,13 +8,16 @@ import { importBuild } from 'vite-plugin-import-build'
 import { getImportBuildCode } from './getImportBuildCode'
 import { transformPageServerFiles } from './transformPageServerFiles'
 import { removeRequireHookPlugin } from './removeRequireHookPlugin'
+import { CrawlLocations, generateImportGlobs } from './generateImportGlobs'
 
 export default plugin
 export { plugin }
 export { plugin as ssr }
 
 // Return as `any` to avoid Plugin type mismatches when there are multiple Vite versions installed
-function plugin(): any {
+function plugin({ crawLocations }: { crawLocations?: CrawlLocations } = {}): any {
+  generateImportGlobs(crawLocations)
+
   const plugins: Plugin[] = [
     dev(),
     build(),

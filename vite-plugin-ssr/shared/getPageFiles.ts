@@ -16,6 +16,8 @@ assertNotAlreadyLoaded()
 let allPageFilesUnprocessed: AllPageFilesUnproccessed | undefined
 
 function setPageFiles(pageFiles: unknown) {
+  assert(hasProp(pageFiles, 'isOriginalFile'), 'Missing isOriginalFile')
+  assert(pageFiles.isOriginalFile === false, `\`isOriginalFile === ${pageFiles.isOriginalFile}\``)
   assert(hasProp(pageFiles, '.page'))
   allPageFilesUnprocessed = pageFiles as AllPageFilesUnproccessed
 }
@@ -37,6 +39,7 @@ type FileType = typeof fileTypes[number]
 type PageFileUnprocessed = Record<PageFile['filePath'], PageFile['loadFile']>
 //*
 type AllPageFilesUnproccessed = {
+  isOriginalFile: false
   '.page': PageFileUnprocessed
   '.page.server': PageFileUnprocessed
   '.page.route': PageFileUnprocessed
@@ -55,7 +58,8 @@ async function getAllPageFiles(isProduction?: boolean): Promise<AllPageFiles> {
       // We reload all glob imports in dev to make auto-reload work
       !isProduction
     ) {
-      allPageFilesUnprocessed = (await asyncGetter()) as any
+      const pageFiles = (await asyncGetter()) as unknown
+      setPageFiles(pageFiles)
     }
     assert(hasProp(allPageFilesUnprocessed, '.page'))
   }
