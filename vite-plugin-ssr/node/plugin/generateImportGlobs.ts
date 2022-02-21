@@ -14,13 +14,10 @@ function generateImportGlobs(crawLocations?: CrawlLocations) {
     entries.push(...crawLocations.include)
   }
 
-  //import '../../dist/esm/node/page-files/pageFiles.js'
-  const pluginRoot = getPluginRoot()
-  const filePath = `${pluginRoot}/dist/esm/node/page-files/pageFiles.js`
   const fileContent = generateFileContent()
-  //console.log(require.resolve(filePath), fileContent)
-  writeFileSync(filePath, fileContent)
-  writeFileSync(`${pluginRoot}/dist/esm/client/page-files/pageFiles.js`, fileContent)
+  // Current directory: node_modules/vite-plugin-ssr/dist/cjs/node/plugin/generateImportGlobs.js
+  writeFileSync('../../../../dist/esm/node/page-files/pageFiles.js', fileContent)
+  writeFileSync('../../../../dist/esm/client/page-files/pageFiles.js', fileContent)
 }
 
 function generateFileContent() {
@@ -40,18 +37,4 @@ export const pageFiles = {
   '.page.route': import.meta.glob('/**/*.page.route.*([a-zA-Z0-9])'),
 }
 `
-}
-
-function getPluginRoot() {
-  // Current directory: 'node_modules/vite-plugin-ssr/dist/cjs/node/plugin/generateImportGlobs.js'
-  const pluginRoot = require.resolve(
-    [
-      //       plugin/
-      '..', // node/
-      '..', // cjs/
-      '..', // dist/
-      '..', // vite-plugin-ssr/
-    ].join('/'),
-  )
-  return pluginRoot
 }
