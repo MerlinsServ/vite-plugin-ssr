@@ -1,40 +1,52 @@
 export { generateImportGlobs }
-export type { CrawlLocations }
 
 import { writeFileSync } from 'fs'
+import { toPosixPath } from '../utils'
 
-type CrawlLocations = {
-  include?: string[]
-}
-
-function generateImportGlobs(crawLocations?: CrawlLocations) {
+function generateImportGlobs(includePageFiles?: string[]) {
   const entries = ['/']
 
-  if (crawLocations?.include) {
-    entries.push(...crawLocations.include)
+  if (includePageFiles) {
+    entries.push(...includePageFiles)
   }
 
-  const fileContent = generateFileContent()
+  const fileContent = getFileContent(entries)
   // Current directory: node_modules/vite-plugin-ssr/dist/cjs/node/plugin/generateImportGlobs.js
   writeFileSync(require.resolve('../../../../dist/esm/node/page-files/pageFiles.js'), fileContent)
   writeFileSync(require.resolve('../../../../dist/esm/client/page-files/pageFiles.js'), fileContent)
 }
 
-function generateFileContent() {
-  return `// This file is generatead by \`plugin/generateImportGlobs.ts\`.
+function getFileContent(entries: string[]) {
+  let fileContent = '// This file was generatead by `node/plugin/generateImportGlobs.ts`.'
 
-// Vite resolves globs with micromatch: https://github.com/micromatch/micromatch
-// Pattern \`*([a-zA-Z0-9])\` is an Extglob: https://github.com/micromatch/micromatch#extglobs
+  fileContent += '\n'
+  fileContent += `
 export const pageFiles = {
   isOriginalFile: false,
-  //@ts-ignore
-  '.page': import.meta.glob('/**/*.page.*([a-zA-Z0-9])'),
-  //@ts-ignore
-  '.page.client': import.meta.glob('/**/*.page.client.*([a-zA-Z0-9])'),
-  //@ts-ignore
-  '.page.server': import.meta.glob('/**/*.page.server.*([a-zA-Z0-9])'),
-  //@ts-ignore
-  '.page.route': import.meta.glob('/**/*.page.route.*([a-zA-Z0-9])'),
+  '.page': {
+${entries.map((pathRoot) => getGlobs(pathRoot, 'page')).join('\n')}
+  },
+'.page.client': {
+${entries.map((pathRoot) => getGlobs(pathRoot, 'page.client')).join('\n')}
+  },
+  '.page.server': {
+${entries.map((pathRoot) => getGlobs(pathRoot, 'page.server')).join('\n')}
+  },
+  '.page.route': {
+${entries.map((pathRoot) => getGlobs(pathRoot, 'page.route')).join('\n')}
+  },
 }
+console.log('pp', pageFiles)
+console.log(22)
 `
+  fileContent += '\n'
+  return fileContent
+}
+
+function getGlobs(pathRoot: string, fileSuffix: 'page' | 'page.client' | 'page.server' | 'page.route'): string {
+  // Vite uses `fast-glob` which resolves globs with `micromatch`: https://github.com/micromatch/micromatch
+  // Pattern \`*([a-zA-Z0-9])\` is an Extglob: https://github.com/micromatch/micromatch#extglobs
+  const fileExtention = '*([a-zA-Z0-9])'
+  const pathParts = [...toPosixPath(pathRoot).split('/'), '**', `*.${fileSuffix}.${fileExtention}`].filter(Boolean)
+  return `    ...(import.meta.glob('/${pathParts.join('/')}')),`
 }

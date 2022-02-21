@@ -6,6 +6,7 @@ import {
   findPageFile,
   findDefaultFiles,
   findDefaultFile,
+  findDefaultFilesSorted,
   PageFile,
 } from '../shared/getPageFiles'
 import { getSsrEnv } from './ssrEnv'
@@ -506,10 +507,11 @@ type PageServerFileProps = {
 }
 type PageServerFile = null | PageServerFileProps
 //*
-type PageServerFiles =
+type PageServerFiles = { pageServerFiles: PageServerFileProps[] } & (
   | { pageServerFile: PageServerFileProps; pageServerFileDefault: PageServerFileProps }
   | { pageServerFile: null; pageServerFileDefault: PageServerFileProps }
   | { pageServerFile: PageServerFileProps; pageServerFileDefault: null }
+)
 /*/
 type PageServerFiles = {
   pageServerFile: PageServerFile | null
@@ -529,11 +531,18 @@ async function loadPageFiles(pageContext: {
   )
   const pageClientPath = getPageClientPath(pageContext)
 
-  const { pageServerFile, pageServerFileDefault } = await loadPageServerFiles(pageContext)
+  const { pageServerFile, pageServerFileDefault, pageServerFiles } = await loadPageServerFiles(pageContext)
+
+  const exports: Record<string, unknown> = {}
+  Object.assign(exports, pageExports)
+  pageServerFiles.forEach((pageServerFile) => {
+    Object.assign(exports, pageServerFile.fileExports)
+  })
 
   const pageFiles = {
     Page,
     pageExports,
+    exports,
     _pageIsomorphicFile: pageIsomorphicFile,
     _pageIsomorphicFileDefault: pageIsomorphicFileDefault,
     _pageServerFile: pageServerFile,
@@ -583,16 +592,18 @@ async function loadPageServerFiles(pageContext: {
     'No `*.page.server.js` file found. Make sure to create one. You can create a `_default.page.server.js` which will apply as default to all your pages.',
   )
 
-  const [pageServerFile, pageServerFileDefault] = await Promise.all([
+  const [pageServerFile, ...pageServerFileDefaults] = await Promise.all([
     loadPageServerFile(findPageFile(serverFiles, pageId)),
-    loadPageServerFile(findDefaultFile(serverFiles, pageId)),
+    ...findDefaultFilesSorted(serverFiles, pageId).map(loadPageServerFile),
   ])
+  const pageServerFileDefault = pageServerFileDefaults[0]
+  const pageServerFiles = [pageServerFile, ...pageServerFileDefaults].filter(<T>(p: T | null): p is T => p !== null)
   assert(pageServerFile || pageServerFileDefault)
   if (pageServerFile !== null) {
-    return { pageServerFile, pageServerFileDefault }
+    return { pageServerFile, pageServerFileDefault, pageServerFiles }
   }
   if (pageServerFileDefault !== null) {
-    return { pageServerFile, pageServerFileDefault }
+    return { pageServerFile, pageServerFileDefault, pageServerFiles }
   }
   assert(false)
 

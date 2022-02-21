@@ -5,6 +5,7 @@ export type { PageFile }
 export { getAllPageFiles }
 export { findPageFile }
 export { findDefaultFiles }
+export { findDefaultFilesSorted }
 export { findDefaultFile }
 
 export { setPageFiles }
@@ -103,6 +104,19 @@ function findDefaultFiles<T extends { filePath: string }>(pageFiles: T[]): T[] {
     assert(!filePath.includes('\\'))
     return filePath.includes('/_default')
   })
+
+  return defaultFiles
+}
+
+function findDefaultFilesSorted<T extends { filePath: string }>(pageFiles: T[], pageId: string): T[] {
+  const defaultFiles = findDefaultFiles(pageFiles)
+  // Sort `_default.page.server.js` files by filesystem proximity to pageId's `*.page.js` file
+  defaultFiles.sort(
+    lowerFirst(({ filePath }) => {
+      if (filePath.startsWith(pageId)) return -1
+      return getPathDistance(pageId, filePath)
+    }),
+  )
   return defaultFiles
 }
 
@@ -116,15 +130,6 @@ function assertNotAlreadyLoaded() {
 }
 
 function findDefaultFile<T extends { filePath: string }>(pageFiles: T[], pageId: string): T | null {
-  const defautFiles = findDefaultFiles(pageFiles)
-
-  // Sort `_default.page.server.js` files by filesystem proximity to pageId's `*.page.js` file
-  defautFiles.sort(
-    lowerFirst(({ filePath }) => {
-      if (filePath.startsWith(pageId)) return -1
-      return getPathDistance(pageId, filePath)
-    }),
-  )
-
-  return defautFiles[0] || null
+  const defaultFiles = findDefaultFilesSorted(pageFiles, pageId)
+  return defaultFiles[0] || null
 }
