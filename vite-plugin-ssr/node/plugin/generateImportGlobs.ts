@@ -16,8 +16,8 @@ function generateImportGlobs(crawLocations?: CrawlLocations) {
 
   const fileContent = generateFileContent()
   // Current directory: node_modules/vite-plugin-ssr/dist/cjs/node/plugin/generateImportGlobs.js
-  writeFileSync('../../../../dist/esm/node/page-files/pageFiles.js', fileContent)
-  writeFileSync('../../../../dist/esm/client/page-files/pageFiles.js', fileContent)
+  writeFileSync(require.resolve('../../../../dist/esm/node/page-files/pageFiles.js'), fileContent)
+  writeFileSync(require.resolve('../../../../dist/esm/client/page-files/pageFiles.js'), fileContent)
 }
 
 function generateFileContent() {
