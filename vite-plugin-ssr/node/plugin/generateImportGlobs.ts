@@ -1,7 +1,6 @@
 export { generateImportGlobs }
 export type { CrawlLocations }
 
-import { assert } from '../../shared/utils'
 import { writeFileSync } from 'fs'
 
 type CrawlLocations = {
@@ -44,15 +43,15 @@ export const pageFiles = {
 }
 
 function getPluginRoot() {
-  //import '../../dist/cjs/node/plugin/generateImportGlobs.js'
-  assert(__dirname.startsWith('/'))
-  assert(__dirname.endsWith('vite-plugin-ssr/dist/cjs/node/plugin'))
-  const pluginRoot = [
-    __dirname, // plugin/
-    '..', // node/
-    '..', // cjs/
-    '..', // dist/
-    '..', // vite-plugin-ssr/
-  ].join('/')
+  // Current directory: 'node_modules/vite-plugin-ssr/dist/cjs/node/plugin/generateImportGlobs.js'
+  const pluginRoot = require.resolve(
+    [
+      //       plugin/
+      '..', // node/
+      '..', // cjs/
+      '..', // dist/
+      '..', // vite-plugin-ssr/
+    ].join('/'),
+  )
   return pluginRoot
 }
