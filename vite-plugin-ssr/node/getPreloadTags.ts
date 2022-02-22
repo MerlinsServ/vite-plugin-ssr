@@ -36,7 +36,7 @@ async function getPreloadUrls(
     assert(clientManifest && serverManifest)
     const visistedAssets = new Set<string>()
     dependencies.forEach((filePath) => {
-      const { manifestKey, manifestEntry, manifest } = getManifestEntry(
+      const { manifestKey, manifest } = getManifestEntry(
         filePath,
         [
           /* We disable this for now; changes to Vite are required for this to work.
@@ -47,7 +47,7 @@ async function getPreloadUrls(
         root,
         true,
       )
-      // console.log('Manifest Entry', filePath, manifestKey, !!manifestEntry)
+      // console.log('Manifest Entry', filePath, manifestKey, !!manifest)
       if (!manifest) return // `filePath` may be missing in the manifest; https://github.com/brillout/vite-plugin-ssr/issues/51
       const onlyCollectStaticAssets = manifest === serverManifest
       collectAssets(manifestKey, preloadUrls, visistedAssets, manifest, onlyCollectStaticAssets)
@@ -64,7 +64,6 @@ function collectAssets(
   manifest: ViteManifest,
   onlyCollectStaticAssets: boolean,
 ): void {
-  console.log('collect start', manifestKey)
   if (visistedAssets.has(manifestKey)) return
   const manifestEntry = manifest[manifestKey]
   assert(manifestEntry)
@@ -75,7 +74,6 @@ function collectAssets(
     const importManifestEntry = manifest[manifestKey]
     assert(importManifestEntry)
     const { file } = importManifestEntry
-    console.log('collect', manifestKey, file)
     if (!onlyCollectStaticAssets) {
       preloadUrls.add(`/${file}`)
     }

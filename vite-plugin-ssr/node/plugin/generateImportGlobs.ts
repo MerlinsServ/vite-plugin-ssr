@@ -1,8 +1,8 @@
 export { generateImportGlobs }
 
 import { writeFileSync } from 'fs'
-//import { relative } from 'path'
-import { toPosixPath, assertPosixPath } from '../utils'
+import { relative } from 'path'
+import { assertPosixPath } from '../utils'
 import type { Plugin } from 'vite'
 import { getRoot } from './utils/getRoot'
 
@@ -19,7 +19,10 @@ function generateImportGlobs(includePageFiles: string[]): Plugin {
 function generate(includePageFiles: string[], root: string) {
   const entries = ['/']
   includePageFiles.forEach((includePath) => {
-    // includePath = relative(root, includePath)
+    assertPosixPath(includePath)
+    if (includePath.startsWith('/')) {
+      includePath = relative(root, includePath)
+    }
     entries.push(includePath)
   })
 
@@ -60,6 +63,7 @@ function getGlobs(pathRoot: string, fileSuffix: 'page' | 'page.client' | 'page.s
   // Vite uses `fast-glob` which resolves globs with `micromatch`: https://github.com/micromatch/micromatch
   // Pattern \`*([a-zA-Z0-9])\` is an Extglob: https://github.com/micromatch/micromatch#extglobs
   const fileExtention = '*([a-zA-Z0-9])'
-  const pathParts = [...toPosixPath(pathRoot).split('/'), '**', `*.${fileSuffix}.${fileExtention}`].filter(Boolean)
+  assertPosixPath(pathRoot)
+  const pathParts = [...pathRoot.split('/'), '**', `*.${fileSuffix}.${fileExtention}`].filter(Boolean)
   return `    ...(import.meta.glob('/${pathParts.join('/')}')),`
 }
