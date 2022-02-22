@@ -1,7 +1,7 @@
 export { generateImportGlobs }
 
 import { writeFileSync } from 'fs'
-import { relative } from 'path'
+//import { relative } from 'path'
 import { toPosixPath, assertPosixPath } from '../utils'
 import type { Plugin } from 'vite'
 import { getRoot } from './utils/getRoot'
@@ -19,8 +19,8 @@ function generateImportGlobs(includePageFiles: string[]): Plugin {
 function generate(includePageFiles: string[], root: string) {
   const entries = ['/']
   includePageFiles.forEach((includePath) => {
-    const includePathRelative = relative(root, includePath)
-    entries.push(includePathRelative)
+    // includePath = relative(root, includePath)
+    entries.push(includePath)
   })
 
   const fileContent = getFileContent(entries, root)

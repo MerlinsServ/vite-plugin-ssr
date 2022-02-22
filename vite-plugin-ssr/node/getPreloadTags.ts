@@ -1,8 +1,9 @@
 import { getSsrEnv } from './ssrEnv'
-import { assert } from './utils'
+import { assert, getRoot } from './utils'
 import { ViteManifest } from './getViteManifest'
 import type { ModuleNode } from 'vite'
 import { AllPageFiles } from '../shared/getPageFiles'
+import { getManifestEntry } from './getManifestEntry'
 
 export { getPreloadUrls }
 
@@ -15,6 +16,7 @@ async function getPreloadUrls(
   serverManifest: null | ViteManifest,
 ): Promise<string[]> {
   const ssrEnv = getSsrEnv()
+  const root = getRoot()
 
   let preloadUrls = new Set<string>()
   if (!ssrEnv.isProduction) {
@@ -35,11 +37,9 @@ async function getPreloadUrls(
     const visistedAssets = new Set<string>()
     dependencies.forEach((filePath) => {
       const modulePath = getModulePath(filePath)
-      let manifest: ViteManifest | undefined = undefined
-      if (serverManifest[modulePath]) manifest = serverManifest
-      if (clientManifest[modulePath]) manifest = clientManifest
-      console.log(modulePath, !!manifest)
-      if (!manifest) return // `modulePath` may be missing in the manifest; https://github.com/brillout/vite-plugin-ssr/issues/51
+      const found = getManifestEntry(filePath, [serverManifest, clientManifest], root, true)
+      if (!found) return // `modulePath` may be missing in the manifest; https://github.com/brillout/vite-plugin-ssr/issues/51
+      const { manifest } = found
       if (manifest === serverManifest) return // We disable this for now; changes to Vite are required for this to work.
       const onlyCollectStaticAssets = manifest === serverManifest
       collectAssets(modulePath, preloadUrls, visistedAssets, manifest, onlyCollectStaticAssets)

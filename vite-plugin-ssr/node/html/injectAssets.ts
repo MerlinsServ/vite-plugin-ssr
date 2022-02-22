@@ -8,7 +8,7 @@ import {
   normalizePath,
   prependBaseUrl,
   slice,
-  toPosixPath
+  getRoot,
 } from '../utils'
 import { getPreloadUrls } from '../getPreloadTags'
 import { getSsrEnv } from '../ssrEnv'
@@ -19,6 +19,7 @@ import { AllPageFiles } from '../../shared/getPageFiles'
 import { serializePageContextClientSide } from '../serializePageContextClientSide'
 import { sanitizeJson } from './injectAssets/sanitizeJson'
 import { assertPageContextProvidedByUser } from '../../shared/assertPageContextProvidedByUser'
+import { getManifestEntry } from '../getManifestEntry'
 
 export { injectAssets__public }
 export { injectAssets }
@@ -48,7 +49,9 @@ async function getPageAssets(
 ): Promise<PageAsset[]> {
   assert(dependencies.every((filePath) => isAbsolute(filePath)))
 
-  const { isProduction = false, root } = getSsrEnv()
+  const { isProduction = false } = getSsrEnv()
+  const root = getRoot()
+
   let clientManifest: null | ViteManifest = null
   let serverManifest: null | ViteManifest = null
   if (isPreRendering || isProduction) {
@@ -71,7 +74,9 @@ async function getPageAssets(
   })
 
   pageClientFilePaths.forEach((pageClientFilePath) => {
-    const scriptSrc = !isProduction ? resolveSrcDev(pageClientFilePath, root) : resolveSrcProd(pageClientFilePath, clientManifest!)
+    const scriptSrc = !isProduction
+      ? resolveSrcDev(pageClientFilePath, root)
+      : resolveSrcProd(pageClientFilePath, clientManifest!, root)
     pageAssets.push({
       src: scriptSrc,
       assetType: 'script',
@@ -250,10 +255,7 @@ function removeDuplicatedBaseUrl(htmlString: string, baseUrl: string): string {
   return htmlString
 }
 
-function resolveSrcDev(filePath: string, root: string | undefined) {
-  root = root || process.cwd()
-  root = toPosixPath(root)
-
+function resolveSrcDev(filePath: string, root: string) {
   assert(!filePath.includes('\\') && !root.includes('\\'), { filePath, root })
   if (filePath.startsWith('/../')) {
     filePath = filePath.slice(1)
@@ -271,20 +273,12 @@ function resolveSrcDev(filePath: string, root: string | undefined) {
     ['@fs', ...root.split('/').filter(Boolean).slice(0, -parentDepth), ...filePath.split('/')].filter(Boolean).join('/')
   return filePath
 }
-function resolveSrcProd(filePath: string, clientManifest: ViteManifest): string {
-  const manifestKey = getManifestKey(filePath)
-  const manifestVal = clientManifest[manifestKey]
-  assert(manifestVal, { manifestKey })
-  assert(manifestVal.isEntry)
-  let { file } = manifestVal
+function resolveSrcProd(filePath: string, clientManifest: ViteManifest, root: string): string {
+  const { manifestEntry } = getManifestEntry(filePath, [clientManifest], root, false)
+  assert(manifestEntry.isEntry)
+  let { file } = manifestEntry
   assert(!file.startsWith('/'))
   return '/' + file
-}
-
-function getManifestKey(filePath: string): string {
-  assert(filePath.startsWith('/'))
-  const manifestKey = filePath.slice(1)
-  return manifestKey
 }
 
 const pageInfoInjectionBegin = '<script id="vite-plugin-ssr_pageContext" type="application/json">'
