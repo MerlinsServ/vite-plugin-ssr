@@ -1,19 +1,14 @@
 import type { Plugin, UserConfig } from 'vite'
 import type { InputOption } from 'rollup'
-import {
-  isAbsolute as pathIsAbsolute,
-  relative as pathRelative,
-  basename as pathFilename,
-  sep as pathSep,
-  posix as pathPosix,
-} from 'path'
-import { assert, assertUsage, isObject } from '../utils'
+import { isAbsolute as pathIsAbsolute, relative as pathRelative, basename as pathFilename } from 'path'
+import { assert, isObject, assertPosixPath } from '../utils'
 import * as glob from 'fast-glob'
 import { isSSR_config } from './utils'
+import { getRoot } from './utils/getRoot'
 
 export { build }
 
-function build(): Plugin {
+function build(includePageFiles: string[]): Plugin {
   let isSsrBuild: boolean | undefined
   return {
     name: 'vite-plugin-ssr:build',
@@ -21,7 +16,7 @@ function build(): Plugin {
     config: (config) => {
       isSsrBuild = isSSR_config(config)
       const input = {
-        ...entryPoints(config),
+        ...entryPoints(config, includePageFiles),
         ...normalizeRollupInput(config.build?.rollupOptions?.input),
       }
       return {
@@ -58,11 +53,11 @@ function removeClientCode(isSsrBuild: boolean, id: string): void | { code: strin
   }
 }
 
-function entryPoints(config: UserConfig): Record<string, string> {
+function entryPoints(config: UserConfig, includePageFiles: string[]): Record<string, string> {
   if (isSSR_config(config)) {
     return serverEntryPoints()
   } else {
-    return browserEntryPoints(config)
+    return browserEntryPoints(config, includePageFiles)
   }
 }
 
@@ -77,12 +72,18 @@ function serverEntryPoints(): Record<string, string> {
   return entryPoints
 }
 
-function browserEntryPoints(config: UserConfig): Record<string, string> {
+function browserEntryPoints(config: UserConfig, includePageFiles: string[]): Record<string, string> {
   const root = getRoot(config)
   assert(pathIsAbsolute(root))
 
-  const browserEntries = glob.sync(`${root}/**/*.page.client.*([a-zA-Z0-9])`, {
-    ignore: ['**/node_modules/**'],
+  const browserEntries: string[] = []
+  ;[root, ...includePageFiles].forEach((crawlRoot) => {
+    assertPosixPath(crawlRoot)
+    assert(!crawlRoot.endsWith('/'))
+    const entries = glob.sync(`${crawlRoot}/**/*.page.client.*([a-zA-Z0-9])`, {
+      ignore: ['**/node_modules/**'],
+    })
+    browserEntries.push(...entries)
   })
 
   const entryPoints: Record<string, string> = {}
@@ -101,28 +102,12 @@ function pathRelativeToRoot(filePath: string, config: UserConfig): string {
   return pathRelative(root, filePath)
 }
 
-function getRoot(config: UserConfig): string {
-  let root = config.root || process.cwd()
-  assertUsage(
-    pathIsAbsolute(root),
-    // Looking at Vite's source code, Vite does seem to normalize `root`.
-    // But this doens't seem to be always the case, see https://github.com/brillout/vite-plugin-ssr/issues/208
-    'The `root` config in your `vite.config.js` should be an absolute path. (I.e. `/path/to/root` instead of `../path/to/root`.)',
-  )
-  root = posixPath(root)
-  return root
-}
-
 function getOutDir(config: UserConfig): string {
   let outDir = config.build?.outDir
   if (!outDir) {
     outDir = 'dist'
   }
   return config.build?.ssr ? `${outDir}/server` : `${outDir}/client`
-}
-
-function posixPath(path: string): string {
-  return path.split(pathSep).join(pathPosix.sep)
 }
 
 function normalizeRollupInput(input?: InputOption): Record<string, string> {

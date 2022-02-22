@@ -42,7 +42,7 @@ async function getPageAssets(
     _baseAssets: string | null
   },
   dependencies: string[],
-  pageClientFilePath: string,
+  pageClientFilePaths: string[],
   isPreRendering: boolean,
 ): Promise<PageAsset[]> {
   assert(dependencies.every((filePath) => isAbsolute(filePath)))
@@ -69,12 +69,14 @@ async function getPageAssets(
     }
   })
 
-  const scriptSrc = !isProduction ? pageClientFilePath : resolveScriptSrc(pageClientFilePath, clientManifest!)
-  pageAssets.push({
-    src: scriptSrc,
-    assetType: 'script',
-    mediaType: 'text/javascript',
-    preloadType: null,
+  pageClientFilePaths.forEach((pageClientFilePath) => {
+    const scriptSrc = !isProduction ? pageClientFilePath : resolveScriptSrc(pageClientFilePath, clientManifest!)
+    pageAssets.push({
+      src: scriptSrc,
+      assetType: 'script',
+      mediaType: 'text/javascript',
+      preloadType: null,
+    })
   })
 
   pageAssets = pageAssets.map((pageAsset) => {
@@ -146,7 +148,6 @@ async function injectAssets__public(htmlString: string, pageContext: Record<stri
   assertUsage(hasProp(pageContext, '_pageId', 'string'), errMsg('`pageContext._pageId` should be a string'))
   assertUsage(hasProp(pageContext, '_getPageAssets'), errMsg('`pageContext._getPageAssets` is missing'))
   assertUsage(hasProp(pageContext, '_passToClient', 'string[]'), errMsg('`pageContext._passToClient` is missing'))
-  assertUsage(hasProp(pageContext, '_pageClientPath', 'string'), errMsg('`pageContext._pageClientPath` is missing'))
   castProp<() => Promise<PageAssets>, typeof pageContext, '_getPageAssets'>(pageContext, '_getPageAssets')
   htmlString = await injectAssets(htmlString, pageContext as any)
   return htmlString
@@ -156,7 +157,6 @@ type PageContextInjectAssets = {
   urlPathname: string
   _getPageAssets: () => Promise<PageAssets>
   _pageId: string
-  _pageClientPath: string
   _passToClient: string[]
   _skipAssetInject?: true
   _pageContextProvidedByUserPromise: Promise<unknown> | null
@@ -188,10 +188,9 @@ async function injectAssetsBeforeRender(htmlString: string, pageContext: PageCon
 
   // Inject script
   const scripts = pageAssets.filter(({ assetType }) => assetType === 'script')
-  assert(scripts.length === 1)
-  const script = scripts[0]
-  assert(script)
-  htmlString = injectScript(htmlString, script)
+  scripts.forEach((script) => {
+    htmlString = injectScript(htmlString, script)
+  })
 
   // Inject preload links
   const preloadAssets = pageAssets

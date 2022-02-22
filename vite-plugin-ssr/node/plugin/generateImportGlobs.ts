@@ -1,28 +1,43 @@
 export { generateImportGlobs }
 
 import { writeFileSync } from 'fs'
-import { toPosixPath } from '../utils'
+import { relative } from 'path'
+import { toPosixPath, assertPosixPath } from '../utils'
+import type { Plugin } from 'vite'
+import { getRoot } from './utils/getRoot'
 
-function generateImportGlobs(includePageFiles?: string[]) {
+function generateImportGlobs(includePageFiles: string[]): Plugin {
+  return {
+    name: 'vite-plugin-ssr:generateImportGlobs',
+    configResolved(config) {
+      const root = getRoot(config)
+      generate(includePageFiles, root)
+    },
+  } as Plugin
+}
+
+function generate(includePageFiles: string[], root: string) {
   const entries = ['/']
+  includePageFiles.forEach((includePath) => {
+    const includePathRelative = relative(root, includePath)
+    entries.push(includePathRelative)
+  })
 
-  if (includePageFiles) {
-    entries.push(...includePageFiles)
-  }
-
-  const fileContent = getFileContent(entries)
+  const fileContent = getFileContent(entries, root)
   // Current directory: node_modules/vite-plugin-ssr/dist/cjs/node/plugin/generateImportGlobs.js
   writeFileSync(require.resolve('../../../../dist/esm/node/page-files/pageFiles.js'), fileContent)
   writeFileSync(require.resolve('../../../../dist/esm/client/page-files/pageFiles.js'), fileContent)
 }
 
-function getFileContent(entries: string[]) {
+function getFileContent(entries: string[], root: string) {
   let fileContent = '// This file was generatead by `node/plugin/generateImportGlobs.ts`.'
 
+  assertPosixPath(root)
   fileContent += '\n'
   fileContent += `
 export const pageFiles = {
   isOriginalFile: false,
+  root: '${root}',
   '.page': {
 ${entries.map((pathRoot) => getGlobs(pathRoot, 'page')).join('\n')}
   },
@@ -36,8 +51,6 @@ ${entries.map((pathRoot) => getGlobs(pathRoot, 'page.server')).join('\n')}
 ${entries.map((pathRoot) => getGlobs(pathRoot, 'page.route')).join('\n')}
   },
 }
-console.log('pp', pageFiles)
-console.log(22)
 `
   fileContent += '\n'
   return fileContent

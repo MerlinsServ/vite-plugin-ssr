@@ -14,4 +14,3 @@ Showcases:
 Boilerplates/Frameworks:
  - [Superfly](https://github.com/deckchairlabs/superfly) - Remix-inspired framework built on top of `vite-plugin-ssr`.
  - [github.com/mate-h/vite-ssr-web](https://github.com/mate-h/vite-ssr-web) - Example using `storeon` for state management, `@phensley/cldr` for i18n, and `tailwindcss` + `postcss` for styling.
- - []

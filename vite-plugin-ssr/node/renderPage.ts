@@ -5,9 +5,9 @@ import {
   getAllPageFiles,
   findPageFile,
   findDefaultFiles,
-  findDefaultFile,
   findDefaultFilesSorted,
   PageFile,
+  findPageFiles,
 } from '../shared/getPageFiles'
 import { getSsrEnv } from './ssrEnv'
 import { stringify } from '@brillout/json-s/stringify'
@@ -29,6 +29,7 @@ import {
   isParsable,
   assertBaseUrl,
   isPromise,
+  notNull,
 } from './utils'
 import { getPageAssets, PageAssets } from './html/injectAssets'
 import {
@@ -529,7 +530,7 @@ async function loadPageFiles(pageContext: {
   const { Page, pageExports, pageIsomorphicFile, pageIsomorphicFileDefault } = await loadPageIsomorphicFiles(
     pageContext,
   )
-  const pageClientPath = getPageClientPath(pageContext)
+  const pageClientFilePaths = getPageClientFilePaths(pageContext)
 
   const { pageServerFile, pageServerFileDefault, pageServerFiles } = await loadPageServerFiles(pageContext)
 
@@ -546,8 +547,8 @@ async function loadPageFiles(pageContext: {
     _pageIsomorphicFile: pageIsomorphicFile,
     _pageIsomorphicFileDefault: pageIsomorphicFileDefault,
     _pageServerFile: pageServerFile,
+    _pageServerFiles: pageServerFiles,
     _pageServerFileDefault: pageServerFileDefault,
-    _pageClientPath: pageClientPath,
   }
 
   objectAssign(pageFiles, {
@@ -559,27 +560,25 @@ async function loadPageFiles(pageContext: {
   const dependencies: string[] = [
     pageIsomorphicFile?.filePath,
     pageIsomorphicFileDefault?.filePath,
-    pageClientPath,
+    ...pageClientFilePaths,
   ].filter((p): p is string => !!p)
   objectAssign(pageFiles, {
     _getPageAssets: async () => {
-      const pageAssets = await getPageAssets(pageContext, dependencies, pageClientPath, isPreRendering)
+      const pageAssets = await getPageAssets(pageContext, dependencies, pageClientFilePaths, isPreRendering)
       return pageAssets
     },
   })
   return pageFiles
 }
-function getPageClientPath(pageContext: { _pageId: string; _allPageFiles: AllPageFiles }): string {
+function getPageClientFilePaths(pageContext: { _pageId: string; _allPageFiles: AllPageFiles }): string[] {
   const { _pageId: pageId, _allPageFiles: allPageFiles } = pageContext
   const pageClientFiles = allPageFiles['.page.client']
   assertUsage(
     pageClientFiles.length > 0,
     'No `*.page.client.js` file found. Make sure to create one. You can create a `_default.page.client.js` which will apply as default to all your pages.',
   )
-  const pageClientPath =
-    findPageFile(pageClientFiles, pageId)?.filePath || findDefaultFile(pageClientFiles, pageId)?.filePath
-  assert(pageClientPath)
-  return pageClientPath
+  const pageClientFilePaths = findPageFiles(pageClientFiles, pageId).map(p => p.filePath)
+  return pageClientFilePaths
 }
 async function loadPageServerFiles(pageContext: {
   _pageId: string
@@ -597,7 +596,7 @@ async function loadPageServerFiles(pageContext: {
     ...findDefaultFilesSorted(serverFiles, pageId).map(loadPageServerFile),
   ])
   const pageServerFileDefault = pageServerFileDefaults[0]
-  const pageServerFiles = [pageServerFile, ...pageServerFileDefaults].filter(<T>(p: T | null): p is T => p !== null)
+  const pageServerFiles = [pageServerFile, ...pageServerFileDefaults].filter(notNull)
   assert(pageServerFile || pageServerFileDefault)
   if (pageServerFile !== null) {
     return { pageServerFile, pageServerFileDefault, pageServerFiles }
@@ -778,10 +777,10 @@ async function executeOnBeforeRenderHooks(
 type LoadedPageFiles = {
   _getPageAssets: () => Promise<PageAssets>
   _pageServerFile: PageServerFile
+  _pageServerFiles: PageServerFileProps[]
   _pageServerFileDefault: PageServerFile
   _pageIsomorphicFile: PageIsomorphicFile
   _pageIsomorphicFileDefault: PageIsomorphicFileDefault
-  _pageClientPath: string
   _passToClient: string[]
 }
 
@@ -801,20 +800,15 @@ async function executeRenderHook(
       hookFilePath: string
     }
 > {
-  assert(pageContext._pageServerFile || pageContext._pageServerFileDefault)
+  assert(pageContext._pageServerFiles)
   let render
   let renderFilePath
-  const pageServerFile = pageContext._pageServerFile
-  const pageRenderFunction = pageServerFile?.fileExports.render
-  if (pageServerFile && pageRenderFunction) {
-    render = pageRenderFunction
-    renderFilePath = pageServerFile.filePath
-  } else {
-    const pageServerFileDefault = pageContext._pageServerFileDefault
-    const pageDefaultRenderFunction = pageServerFileDefault?.fileExports.render
-    if (pageServerFileDefault && pageDefaultRenderFunction) {
-      render = pageDefaultRenderFunction
-      renderFilePath = pageServerFileDefault.filePath
+  for(const pageServerFile of pageContext._pageServerFiles) {
+    const pageRenderFunction = pageServerFile?.fileExports.render
+    if (pageRenderFunction) {
+      render = pageRenderFunction
+      renderFilePath = pageServerFile.filePath
+      break
     }
   }
   assertUsage(

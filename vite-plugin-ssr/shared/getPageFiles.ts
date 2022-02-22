@@ -1,9 +1,10 @@
-import { assert, assertUsage, getPathDistance, hasProp, isBrowser, lowerFirst } from './utils'
+import { assert, assertUsage, getPathDistance, hasProp, isBrowser, lowerFirst, notNull } from './utils'
 
 export type { AllPageFiles }
 export type { PageFile }
 export { getAllPageFiles }
 export { findPageFile }
+export { findPageFiles }
 export { findDefaultFiles }
 export { findDefaultFilesSorted }
 export { findDefaultFile }
@@ -20,6 +21,7 @@ function setPageFiles(pageFiles: unknown) {
   assert(hasProp(pageFiles, 'isOriginalFile'), 'Missing isOriginalFile')
   assert(pageFiles.isOriginalFile === false, `\`isOriginalFile === ${pageFiles.isOriginalFile}\``)
   assert(hasProp(pageFiles, '.page'))
+  assert(hasProp(pageFiles, 'root', 'string'))
   allPageFilesUnprocessed = pageFiles as AllPageFilesUnproccessed
 }
 function isPageFilesSet() {
@@ -41,6 +43,7 @@ type PageFileUnprocessed = Record<PageFile['filePath'], PageFile['loadFile']>
 //*
 type AllPageFilesUnproccessed = {
   isOriginalFile: false
+  root: string
   '.page': PageFileUnprocessed
   '.page.server': PageFileUnprocessed
   '.page.route': PageFileUnprocessed
@@ -65,20 +68,43 @@ async function getAllPageFiles(isProduction?: boolean): Promise<AllPageFiles> {
     assert(hasProp(allPageFilesUnprocessed, '.page'))
   }
   assert(hasProp(allPageFilesUnprocessed, '.page'))
+  assert(hasProp(allPageFilesUnprocessed, 'root', 'string'))
+  const { root } = allPageFilesUnprocessed
 
-  const tranform = (pageFiles: PageFileUnprocessed): PageFile[] => {
-    return Object.entries(pageFiles).map(([filePath, loadFile]) => {
-      return { filePath, loadFile }
-    })
-  }
   const allPageFiles = {
-    '.page': tranform(allPageFilesUnprocessed['.page']),
-    '.page.route': tranform(allPageFilesUnprocessed['.page.route']),
-    '.page.server': tranform(allPageFilesUnprocessed['.page.server']),
-    '.page.client': tranform(allPageFilesUnprocessed['.page.client']),
+    '.page': processGlobResult(allPageFilesUnprocessed['.page'], root),
+    '.page.route': processGlobResult(allPageFilesUnprocessed['.page.route'], root),
+    '.page.server': processGlobResult(allPageFilesUnprocessed['.page.server'], root),
+    '.page.client': processGlobResult(allPageFilesUnprocessed['.page.client'], root),
   }
 
   return allPageFiles
+}
+
+function processGlobResult(pageFiles: PageFileUnprocessed, root: string): PageFile[] {
+  return Object.entries(pageFiles).map(([filePath, loadFile]) => {
+    filePath = resolveFilePath(filePath, root)
+    return { filePath, loadFile }
+  })
+}
+
+function resolveFilePath(filePath: string, root: string): string {
+  assert(!filePath.includes('\\') && !root.includes('\\'), { filePath, root })
+  if (filePath.startsWith('/../')) {
+    filePath = filePath.slice(1)
+  }
+  if (!filePath.startsWith('../')) {
+    return filePath
+  }
+  let parentDepth = 0
+  while (filePath.startsWith('../')) {
+    filePath = filePath.slice(3)
+    parentDepth++
+  }
+  filePath =
+    '/' +
+    ['@fs', ...root.split('/').filter(Boolean).slice(0, -parentDepth), ...filePath.split('/')].filter(Boolean).join('/')
+  return filePath
 }
 
 function findPageFile<T extends { filePath: string }>(pageFiles: T[], pageId: string): T | null {
@@ -96,6 +122,13 @@ function findPageFile<T extends { filePath: string }>(pageFiles: T[], pageId: st
   const pageFile = pageFiles[0]
   assert(pageFile)
   return pageFile
+}
+
+function findPageFiles<T extends { filePath: string }>(allPageFiles: T[], pageId: string): T[] {
+  const pageFiles = [findPageFile(allPageFiles, pageId), ...findDefaultFilesSorted(allPageFiles, pageId)].filter(
+    notNull,
+  )
+  return pageFiles
 }
 
 function findDefaultFiles<T extends { filePath: string }>(pageFiles: T[]): T[] {

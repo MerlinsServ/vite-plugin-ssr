@@ -9,18 +9,19 @@ import { getImportBuildCode } from './getImportBuildCode'
 import { transformPageServerFiles } from './transformPageServerFiles'
 import { removeRequireHookPlugin } from './removeRequireHookPlugin'
 import { generateImportGlobs } from './generateImportGlobs'
+import { resolveConfig, Config } from './resolveConfig'
 
 export default plugin
 export { plugin }
 export { plugin as ssr }
 
 // Return as `any` to avoid Plugin type mismatches when there are multiple Vite versions installed
-function plugin({ includePageFiles }: { includePageFiles?: string[] } = {}): any {
-  generateImportGlobs(includePageFiles)
-
+function plugin(config: Config | Config[]): any {
+  const { includePageFiles } = resolveConfig(config)
   const plugins: Plugin[] = [
+    generateImportGlobs(includePageFiles),
     dev(),
-    build(),
+    build(includePageFiles),
     manifest(),
     importBuild(getImportBuildCode()),
     packageJsonFile(),
