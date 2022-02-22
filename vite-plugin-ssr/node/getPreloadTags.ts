@@ -36,13 +36,21 @@ async function getPreloadUrls(
     assert(clientManifest && serverManifest)
     const visistedAssets = new Set<string>()
     dependencies.forEach((filePath) => {
-      const modulePath = getModulePath(filePath)
-      const found = getManifestEntry(filePath, [serverManifest, clientManifest], root, true)
-      if (!found) return // `modulePath` may be missing in the manifest; https://github.com/brillout/vite-plugin-ssr/issues/51
-      const { manifest } = found
-      if (manifest === serverManifest) return // We disable this for now; changes to Vite are required for this to work.
+      const { manifestKey, manifestEntry, manifest } = getManifestEntry(
+        filePath,
+        [
+          /* We disable this for now; changes to Vite are required for this to work.
+          serverManifest,
+          */
+          clientManifest,
+        ],
+        root,
+        true,
+      )
+      // console.log('Manifest Entry', filePath, manifestKey, !!manifestEntry)
+      if (!manifest) return // `filePath` may be missing in the manifest; https://github.com/brillout/vite-plugin-ssr/issues/51
       const onlyCollectStaticAssets = manifest === serverManifest
-      collectAssets(modulePath, preloadUrls, visistedAssets, manifest, onlyCollectStaticAssets)
+      collectAssets(manifestKey, preloadUrls, visistedAssets, manifest, onlyCollectStaticAssets)
     })
   }
 
@@ -50,26 +58,28 @@ async function getPreloadUrls(
 }
 
 function collectAssets(
-  modulePath: string,
+  manifestKey: string,
   preloadUrls: Set<string>,
   visistedAssets: Set<string>,
   manifest: ViteManifest,
   onlyCollectStaticAssets: boolean,
 ): void {
-  if (visistedAssets.has(modulePath)) return
-  visistedAssets.add(modulePath)
-  const manifestEntry = manifest[modulePath]
+  console.log('collect start', manifestKey)
+  if (visistedAssets.has(manifestKey)) return
+  const manifestEntry = manifest[manifestKey]
   assert(manifestEntry)
+  visistedAssets.add(manifestKey)
 
   const { imports = [], assets = [], css = [] } = manifestEntry
-  for (const importAsset of imports) {
-    const importManifestEntry = manifest[importAsset]
+  for (const manifestKey of imports) {
+    const importManifestEntry = manifest[manifestKey]
     assert(importManifestEntry)
     const { file } = importManifestEntry
+    console.log('collect', manifestKey, file)
     if (!onlyCollectStaticAssets) {
       preloadUrls.add(`/${file}`)
     }
-    collectAssets(importAsset, preloadUrls, visistedAssets, manifest, onlyCollectStaticAssets)
+    collectAssets(manifestKey, preloadUrls, visistedAssets, manifest, onlyCollectStaticAssets)
   }
   for (const cssAsset of css) {
     preloadUrls.add(`/${cssAsset}`)
@@ -78,14 +88,6 @@ function collectAssets(
   for (const asset of assets) {
     preloadUrls.add(`/${asset}`)
   }
-}
-
-function getModulePath(filePath: string): string {
-  let modulePath = filePath
-  if (modulePath.startsWith('/')) {
-    modulePath = modulePath.slice(1)
-  }
-  return modulePath
 }
 
 function collectCss(
