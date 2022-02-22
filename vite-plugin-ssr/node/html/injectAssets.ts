@@ -8,6 +8,7 @@ import {
   normalizePath,
   prependBaseUrl,
   slice,
+  toPosixPath
 } from '../utils'
 import { getPreloadUrls } from '../getPreloadTags'
 import { getSsrEnv } from '../ssrEnv'
@@ -47,7 +48,7 @@ async function getPageAssets(
 ): Promise<PageAsset[]> {
   assert(dependencies.every((filePath) => isAbsolute(filePath)))
 
-  const { isProduction = false } = getSsrEnv()
+  const { isProduction = false, root } = getSsrEnv()
   let clientManifest: null | ViteManifest = null
   let serverManifest: null | ViteManifest = null
   if (isPreRendering || isProduction) {
@@ -70,7 +71,7 @@ async function getPageAssets(
   })
 
   pageClientFilePaths.forEach((pageClientFilePath) => {
-    const scriptSrc = !isProduction ? pageClientFilePath : resolveScriptSrc(pageClientFilePath, clientManifest!)
+    const scriptSrc = !isProduction ? resolveSrcDev(pageClientFilePath, root) : resolveSrcProd(pageClientFilePath, clientManifest!)
     pageAssets.push({
       src: scriptSrc,
       assetType: 'script',
@@ -249,16 +250,41 @@ function removeDuplicatedBaseUrl(htmlString: string, baseUrl: string): string {
   return htmlString
 }
 
-function resolveScriptSrc(filePath: string, clientManifest: ViteManifest): string {
-  assert(filePath.startsWith('/'))
-  assert(getSsrEnv().isProduction)
-  const manifestKey = filePath.slice(1)
+function resolveSrcDev(filePath: string, root: string | undefined) {
+  root = root || process.cwd()
+  root = toPosixPath(root)
+
+  assert(!filePath.includes('\\') && !root.includes('\\'), { filePath, root })
+  if (filePath.startsWith('/../')) {
+    filePath = filePath.slice(1)
+  }
+  if (!filePath.startsWith('../')) {
+    return filePath
+  }
+  let parentDepth = 0
+  while (filePath.startsWith('../')) {
+    filePath = filePath.slice(3)
+    parentDepth++
+  }
+  filePath =
+    '/' +
+    ['@fs', ...root.split('/').filter(Boolean).slice(0, -parentDepth), ...filePath.split('/')].filter(Boolean).join('/')
+  return filePath
+}
+function resolveSrcProd(filePath: string, clientManifest: ViteManifest): string {
+  const manifestKey = getManifestKey(filePath)
   const manifestVal = clientManifest[manifestKey]
-  assert(manifestVal)
+  assert(manifestVal, { manifestKey })
   assert(manifestVal.isEntry)
   let { file } = manifestVal
   assert(!file.startsWith('/'))
   return '/' + file
+}
+
+function getManifestKey(filePath: string): string {
+  assert(filePath.startsWith('/'))
+  const manifestKey = filePath.slice(1)
+  return manifestKey
 }
 
 const pageInfoInjectionBegin = '<script id="vite-plugin-ssr_pageContext" type="application/json">'

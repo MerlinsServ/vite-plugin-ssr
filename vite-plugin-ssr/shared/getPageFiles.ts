@@ -81,30 +81,10 @@ async function getAllPageFiles(isProduction?: boolean): Promise<AllPageFiles> {
   return allPageFiles
 }
 
-function processGlobResult(pageFiles: PageFileUnprocessed, root: string): PageFile[] {
+function processGlobResult(pageFiles: PageFileUnprocessed, _root?: string): PageFile[] {
   return Object.entries(pageFiles).map(([filePath, loadFile]) => {
-    filePath = resolveFilePath(filePath, root)
     return { filePath, loadFile }
   })
-}
-
-function resolveFilePath(filePath: string, root: string): string {
-  assert(!filePath.includes('\\') && !root.includes('\\'), { filePath, root })
-  if (filePath.startsWith('/../')) {
-    filePath = filePath.slice(1)
-  }
-  if (!filePath.startsWith('../')) {
-    return filePath
-  }
-  let parentDepth = 0
-  while (filePath.startsWith('../')) {
-    filePath = filePath.slice(3)
-    parentDepth++
-  }
-  filePath =
-    '/' +
-    ['@fs', ...root.split('/').filter(Boolean).slice(0, -parentDepth), ...filePath.split('/')].filter(Boolean).join('/')
-  return filePath
 }
 
 function findPageFile<T extends { filePath: string }>(pageFiles: T[], pageId: string): T | null {

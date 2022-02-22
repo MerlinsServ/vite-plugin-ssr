@@ -89,7 +89,8 @@ function browserEntryPoints(config: UserConfig, includePageFiles: string[]): Rec
   const entryPoints: Record<string, string> = {}
   for (const filePath of browserEntries) {
     assert(pathIsAbsolute(filePath))
-    const outFilePath = pathRelativeToRoot(filePath, config)
+    let outFilePath = pathRelativeToRoot(filePath, config)
+    outFilePath = outFilePath.split('../').join('_parent/')
     entryPoints[outFilePath] = filePath
   }
   return entryPoints
