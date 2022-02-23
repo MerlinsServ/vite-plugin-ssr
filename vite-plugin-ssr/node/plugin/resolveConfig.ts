@@ -5,9 +5,9 @@ export type { Config }
 
 type Config = { pageFiles?: { include: string[] } }
 
-function resolveConfig(configs: Config | Config[]): { includePageFiles: string[] } {
+function resolveConfig(configs: Config | Config[] | undefined): { includePageFiles: string[] } {
   const includePageFiles: string[] = []
-  const configList = Array.isArray(configs) ? configs : [configs]
+  const configList = !configs ? [] : Array.isArray(configs) ? configs : [configs]
   configList.forEach((config) => {
     if (config.pageFiles) {
       includePageFiles.push(...config.pageFiles.include.map(sanitize))

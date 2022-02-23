@@ -16,7 +16,7 @@ export { plugin }
 export { plugin as ssr }
 
 // Return as `any` to avoid Plugin type mismatches when there are multiple Vite versions installed
-function plugin(config: Config | Config[]): any {
+function plugin(config?: Config | Config[]): any {
   const { includePageFiles } = resolveConfig(config)
   const plugins: Plugin[] = [
     generateImportGlobs(includePageFiles),
