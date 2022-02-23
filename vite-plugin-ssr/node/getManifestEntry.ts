@@ -1,4 +1,4 @@
-import { relative } from 'path/posix'
+import { posix } from 'path'
 import type { ViteManifest, ViteManifestEntry } from './getViteManifest'
 import { assert, assertPosixPath } from './utils'
 
@@ -38,12 +38,12 @@ function getManifestEntry(filePath: string, manifests: ViteManifest[], root: str
 
 function resolveSymlink(filePath: string, root: string) {
   assertPosixPath(filePath)
-  assert(!filePath.startsWith('/'))
   assertPosixPath(root)
+  assert(!filePath.startsWith('/'))
   const filePathAbsolute = [...root.split('/'), ...filePath.split('/')].join('/')
   // Resolves symlinks
   const filePathResolved = require.resolve(filePathAbsolute)
-  const filePathRelative = relative(root, filePathResolved)
+  const filePathRelative = posix.relative(root, filePathResolved)
   assert(!filePathRelative.startsWith('/'))
   return filePathRelative
 }
