@@ -595,7 +595,7 @@ async function loadPageServerFiles(pageContext: {
     loadPageServerFile(findPageFile(serverFiles, pageId)),
     ...findDefaultFilesSorted(serverFiles, pageId).map(loadPageServerFile),
   ])
-  const pageServerFileDefault = pageServerFileDefaults[0]
+  const pageServerFileDefault = pageServerFileDefaults[0] || null
   const pageServerFiles = [pageServerFile, ...pageServerFileDefaults].filter(notNull)
   assert(pageServerFile || pageServerFileDefault)
   if (pageServerFile !== null) {
